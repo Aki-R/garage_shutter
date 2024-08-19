@@ -2,6 +2,10 @@
 #include <WebServer.h>
 #include "secrets.h"  // add WLAN Credentials in here.
 
+#define Uppin 5
+#define Stoppin 16
+#define Downpin 4
+
 WebServer Server(80);         //  ポート番号（HTTP）
 
 
@@ -23,9 +27,9 @@ void SendMessage() {
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
   //  停止0.5s押し
-  digitalWrite(5, LOW);
+  digitalWrite(Stoppin, HIGH);
   delay(500);
-  digitalWrite(5, HIGH);
+  digitalWrite(Stoppin, LOW);
 }
 
 void UpSendMessage() {
@@ -44,9 +48,9 @@ void UpSendMessage() {
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
   //  上昇0.5s押し
-  digitalWrite(4, HIGH);
+  digitalWrite(Uppin, HIGH);
   delay(500);
-  digitalWrite(4, LOW);
+  digitalWrite(Uppin, LOW);
 }
 
 void DownSendMessage() {
@@ -65,9 +69,9 @@ void DownSendMessage() {
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
   //  下降0.5s押し
-  digitalWrite(6, HIGH);
+  digitalWrite(Downpin, HIGH);
   delay(500);
-  digitalWrite(6, LOW);
+  digitalWrite(Downpin, LOW);
 }
 
 //  クライアントにエラーメッセージを返す関数
@@ -78,10 +82,12 @@ void SendNotFound() {
 
 //  メインプログラム
 void setup() {
-  pinMode(4, OUTPUT);
-  pinMode(5, OUTPUT);
-  digitalWrite(5, HIGH);
-  pinMode(6, OUTPUT);
+  pinMode(Uppin, OUTPUT);
+  digitalWrite(Uppin, LOW);
+  pinMode(Downpin, OUTPUT);
+  digitalWrite(Downpin, LOW);
+  pinMode(Stoppin, OUTPUT);
+  digitalWrite(Stoppin, LOW);
   //  シリアルモニタ（動作ログ）
   Serial.begin(115200);               //  ESP 標準の通信速度 115200
   delay(100);                         //  100ms ほど待ってからログ出力可
