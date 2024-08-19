@@ -1,3 +1,3 @@
 
-const char *ssid = "";
-const char *pass = "";
+const char *ssid = " ";
+const char *pass = " ";
