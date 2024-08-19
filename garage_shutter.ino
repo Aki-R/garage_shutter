@@ -22,22 +22,14 @@ void SendMessage() {
   </center>";
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
-  //LEDをON/OFF繰り返す
-  static char flag=false;
-  if(flag)
-  {
-      digitalWrite(13, LOW);
-      flag=false;
-  }
-  else
-  {
-      digitalWrite(13, HIGH);
-      flag=true;
-  }
+  //  停止0.5s押し
+  digitalWrite(5, LOW);
+  delay(500);
+  digitalWrite(5, HIGH);
 }
 
 void UpSendMessage() {
-  Serial.println("OnSendMessage");
+  Serial.println("UpSendMessage");
   String message =   "<html lang=\"ja\">\n\
     <meta charset=\"utf-8\">\n\
     <center>\
@@ -51,12 +43,14 @@ void UpSendMessage() {
   </center>";
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
-  //LEDをONにする
-  digitalWrite(13, HIGH);
+  //  上昇0.5s押し
+  digitalWrite(4, HIGH);
+  delay(500);
+  digitalWrite(4, LOW);
 }
 
 void DownSendMessage() {
-  Serial.println("OffSendMessage");
+  Serial.println("DownSendMessage");
   String message =   "<html lang=\"ja\">\n\
     <meta charset=\"utf-8\">\n\
     <center>\
@@ -70,8 +64,10 @@ void DownSendMessage() {
   </center>";
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
-  //LEDをOFFにする
-  digitalWrite(13, LOW);
+  //  下降0.5s押し
+  digitalWrite(6, HIGH);
+  delay(500);
+  digitalWrite(6, LOW);
 }
 
 //  クライアントにエラーメッセージを返す関数
@@ -82,7 +78,10 @@ void SendNotFound() {
 
 //  メインプログラム
 void setup() {
-  pinMode(13, OUTPUT);
+  pinMode(4, OUTPUT);
+  pinMode(5, OUTPUT);
+  digitalWrite(5, HIGH);
+  pinMode(6, OUTPUT);
   //  シリアルモニタ（動作ログ）
   Serial.begin(115200);               //  ESP 標準の通信速度 115200
   delay(100);                         //  100ms ほど待ってからログ出力可
