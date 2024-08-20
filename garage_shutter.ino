@@ -2,9 +2,9 @@
 #include <WebServer.h>
 #include "secrets.h"  // add WLAN Credentials in here.
 
-#define Uppin 5
-#define Stoppin 16
-#define Downpin 4
+#define Uppin 32
+#define Stoppin 33
+#define Downpin 26
 
 WebServer Server(80);         //  ポート番号（HTTP）
 
