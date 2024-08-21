@@ -27,9 +27,9 @@ void SendMessage() {
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
   //  停止0.5s押し
-  digitalWrite(Stoppin, HIGH);
-  delay(500);
   digitalWrite(Stoppin, LOW);
+  delay(500);
+  digitalWrite(Stoppin, HIGH);
 }
 
 void UpSendMessage() {
@@ -48,9 +48,9 @@ void UpSendMessage() {
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
   //  上昇0.5s押し
-  digitalWrite(Uppin, HIGH);
-  delay(500);
   digitalWrite(Uppin, LOW);
+  delay(500);
+  digitalWrite(Uppin, HIGH);
 }
 
 void DownSendMessage() {
@@ -69,9 +69,9 @@ void DownSendMessage() {
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
   //  下降0.5s押し
-  digitalWrite(Downpin, HIGH);
-  delay(500);
   digitalWrite(Downpin, LOW);
+  delay(500);
+  digitalWrite(Downpin, HIGH);
 }
 
 //  クライアントにエラーメッセージを返す関数
@@ -83,11 +83,11 @@ void SendNotFound() {
 //  メインプログラム
 void setup() {
   pinMode(Uppin, OUTPUT);
-  digitalWrite(Uppin, LOW);
+  digitalWrite(Uppin, HIGH);
   pinMode(Downpin, OUTPUT);
-  digitalWrite(Downpin, LOW);
+  digitalWrite(Downpin, HIGH);
   pinMode(Stoppin, OUTPUT);
-  digitalWrite(Stoppin, LOW);
+  digitalWrite(Stoppin, HIGH);
   //  シリアルモニタ（動作ログ）
   Serial.begin(115200);               //  ESP 標準の通信速度 115200
   delay(100);                         //  100ms ほど待ってからログ出力可
