@@ -98,10 +98,20 @@ void LightSendMessage() {
   </center>";
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
-  //  下降0.5s押し
-  digitalWrite(Lighting, LOW);
-  delay(500);
-  digitalWrite(Lighting, HIGH);
+  //  トグル動作
+  static char toggle=true;
+  if(toggle)
+  {
+    digitalWrite(Lighting, HIGH);
+    toggle=false;
+  }
+  else
+  {
+    digitalWrite(Lighting, LOW);
+    toggle=true;
+  }
+
+  
 }
 
 //  クライアントにエラーメッセージを返す関数
