@@ -5,6 +5,7 @@
 #define Uppin 32
 #define Stoppin 33
 #define Downpin 26
+#define Lighting 27
 
 WebServer Server(80);         //  ポート番号（HTTP）
 
@@ -23,6 +24,8 @@ void SendMessage() {
       style='width:200px;height:40px;'>停止</button></p>\
     <p><button type='button' onclick='location.href=\"/down\"' \
       style='width:200px;height:40px;'>下降</button></p>\
+    <p><button type='button' onclick='location.href=\"/lighting\"' \
+      style='width:200px;height:40px;'>照明</button></p>\
   </center>";
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
@@ -44,6 +47,8 @@ void UpSendMessage() {
       style='width:200px;height:40px;'>停止</button></p>\
     <p><button type='button' onclick='location.href=\"/down\"' \
       style='width:200px;height:40px;'>下降</button></p>\
+    <p><button type='button' onclick='location.href=\"/lighting\"' \
+      style='width:200px;height:40px;'>照明</button></p>\
   </center>";
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
@@ -65,6 +70,8 @@ void DownSendMessage() {
       style='width:200px;height:40px;'>停止</button></p>\
     <p><button type='button' onclick='location.href=\"/down\"' \
       style='width:200px;height:40px;'>下降</button></p>\
+    <p><button type='button' onclick='location.href=\"/lighting\"' \
+      style='width:200px;height:40px;'>照明</button></p>\
   </center>";
   //  クライアントにレスポンスを返す
   Server.send(200, "text/html", message);
@@ -72,6 +79,29 @@ void DownSendMessage() {
   digitalWrite(Downpin, LOW);
   delay(500);
   digitalWrite(Downpin, HIGH);
+}
+
+void LightSendMessage() {
+  Serial.println("LightSendMessage");
+  String message =   "<html lang=\"ja\">\n\
+    <meta charset=\"utf-8\">\n\
+    <center>\
+    <h2>シャッターボタン</h2>\
+    <p><button type='button' onclick='location.href=\"/up\"' \
+      style='width:200px;height:40px;'>上昇</button></p>\
+    <p><button type='button' onclick='location.href=\"/\"' \
+      style='width:200px;height:40px;'>停止</button></p>\
+    <p><button type='button' onclick='location.href=\"/down\"' \
+      style='width:200px;height:40px;'>下降</button></p>\
+    <p><button type='button' onclick='location.href=\"/lighting\"' \
+      style='width:200px;height:40px;'>照明</button></p>\
+  </center>";
+  //  クライアントにレスポンスを返す
+  Server.send(200, "text/html", message);
+  //  下降0.5s押し
+  digitalWrite(Lighting, LOW);
+  delay(500);
+  digitalWrite(Lighting, HIGH);
 }
 
 //  クライアントにエラーメッセージを返す関数
@@ -88,6 +118,8 @@ void setup() {
   digitalWrite(Downpin, HIGH);
   pinMode(Stoppin, OUTPUT);
   digitalWrite(Stoppin, HIGH);
+  pinMode(Lighting, OUTPUT);
+  digitalWrite(Lighting, HIGH);
   //  シリアルモニタ（動作ログ）
   Serial.begin(115200);               //  ESP 標準の通信速度 115200
   delay(100);                         //  100ms ほど待ってからログ出力可
@@ -108,6 +140,7 @@ void setup() {
   Server.on("/", SendMessage);         //  ルートアクセス時の応答関数を設定
   Server.on("/up", UpSendMessage);
   Server.on("/down", DownSendMessage);
+  Server.on("/lighting", LightSendMessage);
   Server.onNotFound(SendNotFound);  //  不正アクセス時の応答関数を設定
   Server.begin();                     //  ウェブサーバ開始
 
