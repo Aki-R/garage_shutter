@@ -6,7 +6,7 @@
 #define Downpin 26
 #define Lighting 27
 
-WifiClinet client;
+WiFiClient client;
 
 const int port = PORT;
 const char* host = HOST;
@@ -79,7 +79,7 @@ void loop() {
       }else if(message == "Stop"){
         StopSendMessage();
       }else if(message == "Down"){
-        DownSendMEssage();
+        DownSendMessage();
       }
     }
   }
