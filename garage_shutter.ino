@@ -63,10 +63,12 @@ void setup() {
 }
 void loop() {
   //  クライアントからの要求を処理する
-  if (client.connect(host, port)) {
-    Serial.println("Connected to server");
-  } else {
-    Serial.println("Connection to server failed");
+  if (!client.connected()){
+    if (client.connect(host, port)) {
+      Serial.println("Connected to server");
+    } else {
+      Serial.println("Connection to server failed");
+    }
   }
 
   if (client.connected()) {
@@ -83,4 +85,5 @@ void loop() {
       }
     }
   }
+  delay(100);
 }
