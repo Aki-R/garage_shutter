@@ -11,6 +11,8 @@ WiFiClient client;
 const int port = PORT;
 const char* host = HOST;
 
+bool light_status = false;
+
 void StopSendMessage() {
   Serial.println("Stop Command");
   //  停止0.5s押し
@@ -34,6 +36,17 @@ void DownSendMessage() {
   digitalWrite(Downpin, HIGH);
 }
 
+void LightSendMessage() {
+  Serial.println("Light Command");
+  light_status = !light_status;
+  if(light_status){
+    digitalWrite(Lighting, HIGH);
+  }
+  else{
+    digitalWrite(Lighting, LOW);
+  }
+}
+
 //  メインプログラム
 void setup() {
   pinMode(Uppin, OUTPUT);
@@ -49,7 +62,7 @@ void setup() {
   delay(100);                         //  100ms ほど待ってからログ出力可
   Serial.println("\n*** Starting ***");
   //  無線 LAN に接続
-  WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_STA);        
   WiFi.begin(SSID, PASS);             
   Serial.println("Connecting...");
   while (WiFi.status() != WL_CONNECTED) {
@@ -82,6 +95,8 @@ void loop() {
         StopSendMessage();
       }else if(message == "Down"){
         DownSendMessage();
+      }else if(message == "Light"){
+        LightSendMessage();
       }
     }
   }
