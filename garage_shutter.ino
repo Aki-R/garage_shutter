@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include "secrets.h"  // add WLAN Credentials and Host info in here.
+#include "esp_task_wdt.h"
 
 #define Uppin 32
 #define Stoppin 33
@@ -12,6 +13,8 @@ const int port = PORT;
 const char* host = HOST;
 
 bool light_status = false;
+
+esp_task_wdt_config_t config;
 
 void StopSendMessage() {
   Serial.println("Stop Command");
@@ -61,6 +64,15 @@ void setup() {
   Serial.begin(115200);               //  ESP 標準の通信速度 115200
   delay(100);                         //  100ms ほど待ってからログ出力可
   Serial.println("\n*** Starting ***");
+  // Watch Dog
+  config.timeout_ms = 10000;
+  config.trigger_panic = true;
+  config.idle_core_mask = (1 << portNUM_PROCESSORS) - 1; //All processor
+  esp_task_wdt_deinit();
+  esp_task_wdt_init(&config); // タイムアウトを設定し、システムリセットを有効にする
+  esp_task_wdt_add(NULL);
+  esp_task_wdt_reset();
+  Serial.println("WDT start");
   //  無線 LAN に接続
   WiFi.mode(WIFI_STA);        
   WiFi.begin(SSID, PASS);             
@@ -84,7 +96,9 @@ void loop() {
     }
   }
 
-  if (client.connected()) {
+  if (client.connected()){
+    esp_task_wdt_reset();
+    delay(1);
     if (client.available()) {
       String message = client.readStringUntil('\n'); // 改行文字まで読み込む
       Serial.print("Received message: ");
@@ -98,6 +112,7 @@ void loop() {
       }else if(message == "Light"){
         LightSendMessage();
       }
+      // client.write("Command Received");
     }
   }
   delay(100);
