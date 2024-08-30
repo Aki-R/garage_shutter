@@ -22,9 +22,6 @@ AsyncWebServer server(80);
 const int port = PORT;
 const char* host = HOST;
 
-//　照明のStatus
-bool light_status = false;
-
 // Watchdogの設定
 esp_task_wdt_config_t config;
 
@@ -69,12 +66,11 @@ void DownSendMessage() {
 
 void LightSendMessage() {
   Serial.println("Light Command");
-  light_status = !light_status;
-  if(light_status){
-    digitalWrite(Lighting, HIGH);
+  if(digitalRead(Lighting)){
+    digitalWrite(Lighting, LOW);
   }
   else{
-    digitalWrite(Lighting, LOW);
+    digitalWrite(Lighting, HIGH);
   }
 }
 
