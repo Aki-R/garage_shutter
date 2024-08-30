@@ -130,7 +130,7 @@ void setup() {
   server.on("/up", HTTP_GET, [](AsyncWebServerRequest *request){
     digitalWrite(Uppin, LOW);    
     delay(500);
-    digitalWrite(DUppin, HIGH);
+    digitalWrite(Uppin, HIGH);
     request->send(SPIFFS, "/index.html", String(), false, processor);
   });
   
