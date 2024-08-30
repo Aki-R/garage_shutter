@@ -1,4 +1,6 @@
 #include <WiFi.h>
+#include "ESPAsyncWebServer.h"
+#include "SPIFFS.h"
 #include "secrets.h"  // add WLAN Credentials and Host info in here.
 #include "esp_task_wdt.h"
 
@@ -7,14 +9,40 @@
 #define Downpin 26
 #define Lighting 27
 
+// LEDの状態を保持する変数
+String ledState;
+
+// Socket通信用のclient
 WiFiClient client;
 
+// ポート80にサーバーを設定
+AsyncWebServer server(80);
+
+// Socket通信のポートとホスト
 const int port = PORT;
 const char* host = HOST;
 
+//　照明のStatus
 bool light_status = false;
 
+// Watchdogの設定
 esp_task_wdt_config_t config;
+
+// 実際のピン出力によってhtmlファイル内のSTATEの文字を変える
+String processor(const String& var){
+  Serial.println(var);
+  if(var == "STATE"){
+    if(digitalRead(Lighting)){
+      ledState = "ON";
+    }
+    else{
+      ledState = "OFF";
+    }
+    Serial.print(ledState);
+    return ledState;
+  }
+  return String();
+}
 
 void StopSendMessage() {
   Serial.println("Stop Command");
@@ -64,7 +92,12 @@ void setup() {
   Serial.begin(115200);               //  ESP 標準の通信速度 115200
   delay(100);                         //  100ms ほど待ってからログ出力可
   Serial.println("\n*** Starting ***");
-  // Watch Dog
+  // SPIFFSのセットアップ
+  if(!SPIFFS.begin(true)){
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
+  }
+  // Watch Dog Setup
   config.timeout_ms = 10000;
   config.trigger_panic = true;
   config.idle_core_mask = (1 << portNUM_PROCESSORS) - 1; //All processor
@@ -76,7 +109,8 @@ void setup() {
   //  無線 LAN に接続
   WiFi.mode(WIFI_STA);        
   WiFi.begin(SSID, PASS);             
-  Serial.println("Connecting...");
+  Serial.println("Connecting Wifi...");
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     if (WiFi.status() == WL_CONNECT_FAILED) {
@@ -85,6 +119,32 @@ void setup() {
   }
   Serial.println("Connected");
   Serial.println(WiFi.localIP());     //  ESP 自身の IP アドレスをログ出力
+
+  // サーバーのルートディレクトリにアクセスされた時のレスポンス
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/index.html", String(), false, processor);
+  });
+  
+  // style.cssにアクセスされた時のレスポンス
+  server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/style.css", "text/css");
+  });
+
+  // Onボタンが押された時のレスポンス
+  server.on("/on", HTTP_GET, [](AsyncWebServerRequest *request){
+    digitalWrite(Lighting, HIGH);    
+    request->send(SPIFFS, "/index.html", String(), false, processor);
+  });
+  
+  // Offボタンが押された時のレスポンス
+  server.on("/off", HTTP_GET, [](AsyncWebServerRequest *request){
+    digitalWrite(Lighting, LOW);    
+    request->send(SPIFFS, "/index.html", String(), false, processor);
+  });
+
+  // サーバースタート
+  server.begin();
+    
 }
 void loop() {
   //  クライアントからの要求を処理する
