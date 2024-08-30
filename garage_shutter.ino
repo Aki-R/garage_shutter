@@ -32,8 +32,16 @@ String processor(const String& var){
 
 //  メインプログラム
 void setup() {
- Serial.begin(115200);
-  pinMode(Lighting, OUTPUT); //GPIO02をアウトプットに
+  pinMode(Uppin, OUTPUT);
+  digitalWrite(Uppin, HIGH);
+  pinMode(Downpin, OUTPUT);
+  digitalWrite(Downpin, HIGH);
+  pinMode(Stoppin, OUTPUT);
+  digitalWrite(Stoppin, HIGH);
+  pinMode(Lighting, OUTPUT);
+  digitalWrite(Lighting, HIGH);
+  //  シリアルモニタ（動作ログ）
+  Serial.begin(115200);               //  ESP 標準の通信速度 115200
 
   // SPIFFSのセットアップ
   if(!SPIFFS.begin(true)){
@@ -61,15 +69,43 @@ void setup() {
     request->send(SPIFFS, "/style.css", "text/css");
   });
 
-  // Onボタンが押された時のレスポンス
-  server.on("/on", HTTP_GET, [](AsyncWebServerRequest *request){
-    digitalWrite(Lighting, HIGH);    
+  // UPボタンが押された時のレスポンス
+  server.on("/up", HTTP_GET, [](AsyncWebServerRequest *request){
+    digitalWrite(Uppin, LOW);    
+    delay(500);
+    digitalWrite(DUppin, HIGH);
     request->send(SPIFFS, "/index.html", String(), false, processor);
   });
   
-  // Offボタンが押された時のレスポンス
-  server.on("/off", HTTP_GET, [](AsyncWebServerRequest *request){
-    digitalWrite(Lighting, LOW);    
+  // STOPボタンが押された時のレスポンス
+  server.on("/stop", HTTP_GET, [](AsyncWebServerRequest *request){
+    digitalWrite(Stoppin, LOW);    
+    delay(500);
+    digitalWrite(Stoppin, HIGH);
+    request->send(SPIFFS, "/index.html", String(), false, processor);
+  });
+
+  // DOWNボタンが押された時のレスポンス
+  server.on("/down", HTTP_GET, [](AsyncWebServerRequest *request){
+    digitalWrite(Downpin, LOW);    
+    delay(500);
+    digitalWrite(Downpin, HIGH); 
+    request->send(SPIFFS, "/index.html", String(), false, processor);
+  });
+
+  // LEDボタンが押された時のレスポンス
+  server.on("/led", HTTP_GET, [](AsyncWebServerRequest *request){
+    static bool toggle = true;
+    if(toggle)
+    {
+      digitalWrite(Lighting, HIGH);
+      toggle=false;
+    }
+    else
+    {
+      digitalWrite(Lighting, LOW);
+      toggle=true;
+    }
     request->send(SPIFFS, "/index.html", String(), false, processor);
   });
 
