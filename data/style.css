@@ -9,7 +9,7 @@ html {
     padding: 2vh;
   }
   p{
-    font-size: 1.5rem;
+    font-size: 2rem;
   }
   .button {
     display: inline-block;
@@ -24,5 +24,8 @@ html {
     cursor: pointer;
   }
   .button2 {
-    background-color: #f44336;
+    background-color: #0f0d01;
+  }
+  .button3 {
+    background-color: #f8920b;
   }
