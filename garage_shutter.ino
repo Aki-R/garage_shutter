@@ -35,7 +35,7 @@ String processor(const String& var){
     else{
       ledState = "OFF";
     }
-    Serial.print(ledState);
+    Serial.println(ledState);
     return ledState;
   }
   return String();
