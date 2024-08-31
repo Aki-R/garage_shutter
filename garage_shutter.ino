@@ -128,13 +128,13 @@ void setup() {
 
   // UPボタンが押された時のレスポンス
   server.on("/up", HTTP_GET, [](AsyncWebServerRequest *request){
-    StopSendMessage();
+    UpSendMessage();
     request->send(SPIFFS, "/index.html", String(), false, processor);
   });
   
   // STOPボタンが押された時のレスポンス
   server.on("/stop", HTTP_GET, [](AsyncWebServerRequest *request){
-    UpSendMessage();
+    StopSendMessage();
     request->send(SPIFFS, "/index.html", String(), false, processor);
   });
 
