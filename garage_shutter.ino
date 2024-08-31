@@ -80,9 +80,7 @@ void LightSendMessage() {
 
 ///ESP32 Monitoring////
 // Google Apps ScriptのURL
-const char* googleScriptURL = "https://script.google.com/macros/s/AKfycbxK2bxQGBxnNVoMqabIdiQLv2ISO7PKYCQcoKztlI27feLqMungcLlepI5CKpEtKaFA/exec";
-//const char* googleScriptURL = "https://script.google.com/macros/s/  Deproy_ID  /exec";
-
+const char* googleScriptURL = gooScrURL;
 
 
 //  メインプログラム
