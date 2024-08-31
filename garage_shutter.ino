@@ -22,8 +22,10 @@ AsyncWebServer server(80);
 const int port = PORT;
 const char* host = HOST;
 
+/*
 // Watchdogの設定
 esp_task_wdt_config_t config;
+*/
 
 // 実際のピン出力によってhtmlファイル内のSTATEの文字を変える
 String processor(const String& var){
@@ -88,11 +90,14 @@ void setup() {
   Serial.begin(115200);               //  ESP 標準の通信速度 115200
   delay(100);                         //  100ms ほど待ってからログ出力可
   Serial.println("\n*** Starting ***");
+
   // SPIFFSのセットアップ
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
   }
+
+  /*
   // Watch Dog Setup
   config.timeout_ms = 10000;
   config.trigger_panic = true;
@@ -102,6 +107,8 @@ void setup() {
   esp_task_wdt_add(NULL);
   esp_task_wdt_reset();
   Serial.println("WDT start");
+*/
+  
   //  無線 LAN に接続
   WiFi.mode(WIFI_STA);        
   WiFi.begin(SSID, PASS);             
@@ -171,6 +178,7 @@ void setup() {
     
 }
 void loop() {
+  Serial.println("loop start");
   //  クライアントからの要求を処理する
   if (!client.connected()){
     if (client.connect(host, port)) {
