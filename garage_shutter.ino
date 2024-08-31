@@ -1,34 +1,48 @@
 #include <WiFi.h>
-#include <WebServer.h>
-#include "secrets.h"  // add WLAN Credentials in here.
+#include "ESPAsyncWebServer.h"
+#include "SPIFFS.h"
+#include "secrets.h"  // add WLAN Credentials and Host info in here.
+// #include "esp_task_wdt.h"
 
 #define Uppin 32
 #define Stoppin 33
 #define Downpin 26
 #define Lighting 27
 
-WebServer Server(80);         //  ポート番号（HTTP）
+// LEDの状態を保持する変数
+String ledState;
 
+// Socket通信用のclient
+WiFiClient client;
 
-//  クライアントにウェブページ（HTML）を返す関数
-void SendMessage() {
-  //  レスポンス文字列の生成（'\n' は改行; '\' は行継続）
-  Serial.println("SendMessage");
-  String message =   "<html lang=\"ja\">\n\
-    <meta charset=\"utf-8\">\n\
-    <center>\
-    <h2>シャッターボタン</h2>\
-    <p><button type='button' onclick='location.href=\"/up\"' \
-      style='width:200px;height:40px;'>上昇</button></p>\
-    <p><button type='button' onclick='location.href=\"/\"' \
-      style='width:200px;height:40px;'>停止</button></p>\
-    <p><button type='button' onclick='location.href=\"/down\"' \
-      style='width:200px;height:40px;'>下降</button></p>\
-    <p><button type='button' onclick='location.href=\"/lighting\"' \
-      style='width:200px;height:40px;'>照明</button></p>\
-  </center>";
-  //  クライアントにレスポンスを返す
-  Server.send(200, "text/html", message);
+// ポート80にサーバーを設定
+AsyncWebServer server(80);
+
+// Socket通信のポートとホスト
+const int port = PORT;
+const char* host = HOST;
+
+// Watchdogの設定
+// esp_task_wdt_config_t config;
+
+// 実際のピン出力によってhtmlファイル内のSTATEの文字を変える
+String processor(const String& var){
+  Serial.println(var);
+  if(var == "STATE"){
+    if(digitalRead(Lighting)){
+      ledState = "ON";
+    }
+    else{
+      ledState = "OFF";
+    }
+    Serial.println(ledState);
+    return ledState;
+  }
+  return String();
+}
+
+void StopSendMessage() {
+  Serial.println("Stop Command");
   //  停止0.5s押し
   digitalWrite(Stoppin, LOW);
   delay(500);
@@ -36,22 +50,7 @@ void SendMessage() {
 }
 
 void UpSendMessage() {
-  Serial.println("UpSendMessage");
-  String message =   "<html lang=\"ja\">\n\
-    <meta charset=\"utf-8\">\n\
-    <center>\
-    <h2>シャッターボタン</h2>\
-    <p><button type='button' onclick='location.href=\"/up\"' \
-      style='width:200px;height:40px;'>上昇</button></p>\
-    <p><button type='button' onclick='location.href=\"/\"' \
-      style='width:200px;height:40px;'>停止</button></p>\
-    <p><button type='button' onclick='location.href=\"/down\"' \
-      style='width:200px;height:40px;'>下降</button></p>\
-    <p><button type='button' onclick='location.href=\"/lighting\"' \
-      style='width:200px;height:40px;'>照明</button></p>\
-  </center>";
-  //  クライアントにレスポンスを返す
-  Server.send(200, "text/html", message);
+  Serial.println("Up Command");
   //  上昇0.5s押し
   digitalWrite(Uppin, LOW);
   delay(500);
@@ -59,65 +58,20 @@ void UpSendMessage() {
 }
 
 void DownSendMessage() {
-  Serial.println("DownSendMessage");
-  String message =   "<html lang=\"ja\">\n\
-    <meta charset=\"utf-8\">\n\
-    <center>\
-    <h2>シャッターボタン</h2>\
-    <p><button type='button' onclick='location.href=\"/up\"' \
-      style='width:200px;height:40px;'>上昇</button></p>\
-    <p><button type='button' onclick='location.href=\"/\"' \
-      style='width:200px;height:40px;'>停止</button></p>\
-    <p><button type='button' onclick='location.href=\"/down\"' \
-      style='width:200px;height:40px;'>下降</button></p>\
-    <p><button type='button' onclick='location.href=\"/lighting\"' \
-      style='width:200px;height:40px;'>照明</button></p>\
-  </center>";
-  //  クライアントにレスポンスを返す
-  Server.send(200, "text/html", message);
-  //  下降0.5s押し
+  Serial.println("Down Command");
   digitalWrite(Downpin, LOW);
   delay(500);
   digitalWrite(Downpin, HIGH);
 }
 
 void LightSendMessage() {
-  Serial.println("LightSendMessage");
-  String message =   "<html lang=\"ja\">\n\
-    <meta charset=\"utf-8\">\n\
-    <center>\
-    <h2>シャッターボタン</h2>\
-    <p><button type='button' onclick='location.href=\"/up\"' \
-      style='width:200px;height:40px;'>上昇</button></p>\
-    <p><button type='button' onclick='location.href=\"/\"' \
-      style='width:200px;height:40px;'>停止</button></p>\
-    <p><button type='button' onclick='location.href=\"/down\"' \
-      style='width:200px;height:40px;'>下降</button></p>\
-    <p><button type='button' onclick='location.href=\"/lighting\"' \
-      style='width:200px;height:40px;'>照明</button></p>\
-  </center>";
-  //  クライアントにレスポンスを返す
-  Server.send(200, "text/html", message);
-  //  トグル動作
-  static char toggle=true;
-  if(toggle)
-  {
-    digitalWrite(Lighting, HIGH);
-    toggle=false;
-  }
-  else
-  {
+  Serial.println("Light Command");
+  if(digitalRead(Lighting)){
     digitalWrite(Lighting, LOW);
-    toggle=true;
   }
-
-  
-}
-
-//  クライアントにエラーメッセージを返す関数
-void SendNotFound() {
-  Serial.println("SendNotFound");
-  Server.send(404, "text/plain", "404 not found...");
+  else{
+    digitalWrite(Lighting, HIGH);
+  }
 }
 
 //  メインプログラム
@@ -134,10 +88,25 @@ void setup() {
   Serial.begin(115200);               //  ESP 標準の通信速度 115200
   delay(100);                         //  100ms ほど待ってからログ出力可
   Serial.println("\n*** Starting ***");
+  // SPIFFSのセットアップ
+  if(!SPIFFS.begin(true)){
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
+  }
+  // Watch Dog Setup
+  // config.timeout_ms = 100000;
+  // config.trigger_panic = true;
+  // config.idle_core_mask = (1 << portNUM_PROCESSORS) - 1; //All processor
+  // esp_task_wdt_deinit();
+  // esp_task_wdt_init(&config); // タイムアウトを設定し、システムリセットを有効にする
+  // esp_task_wdt_add(NULL);
+  // esp_task_wdt_reset();
+  // Serial.println("WDT start");
   //  無線 LAN に接続
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, pass);             
-  Serial.println("Connecting...");
+  WiFi.mode(WIFI_STA);        
+  WiFi.begin(SSID, PASS);             
+  Serial.println("Connecting Wifi...");
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     if (WiFi.status() == WL_CONNECT_FAILED) {
@@ -146,18 +115,73 @@ void setup() {
   }
   Serial.println("Connected");
   Serial.println(WiFi.localIP());     //  ESP 自身の IP アドレスをログ出力
-  //  ウェブサーバの設定
-  Server.on("/", SendMessage);         //  ルートアクセス時の応答関数を設定
-  Server.on("/up", UpSendMessage);
-  Server.on("/down", DownSendMessage);
-  Server.on("/lighting", LightSendMessage);
-  Server.onNotFound(SendNotFound);  //  不正アクセス時の応答関数を設定
-  Server.begin();                     //  ウェブサーバ開始
 
+  // サーバーのルートディレクトリにアクセスされた時のレスポンス
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/index.html", String(), false, processor);
+  });
+  
+  // style.cssにアクセスされた時のレスポンス
+  server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/style.css", "text/css");
+  });
+
+  // UPボタンが押された時のレスポンス
+  server.on("/up", HTTP_GET, [](AsyncWebServerRequest *request){
+    UpSendMessage();
+    request->send(SPIFFS, "/index.html", String(), false, processor);
+  });
+  
+  // STOPボタンが押された時のレスポンス
+  server.on("/stop", HTTP_GET, [](AsyncWebServerRequest *request){
+    StopSendMessage();
+    request->send(SPIFFS, "/index.html", String(), false, processor);
+  });
+
+  // DOWNボタンが押された時のレスポンス
+  server.on("/down", HTTP_GET, [](AsyncWebServerRequest *request){
+    DownSendMessage();
+    request->send(SPIFFS, "/index.html", String(), false, processor);
+  });
+
+  // LEDボタンが押された時のレスポンス
+  server.on("/led", HTTP_GET, [](AsyncWebServerRequest *request){
+    LightSendMessage();
+    request->send(SPIFFS, "/index.html", String(), false, processor);
+  });
+
+  // サーバースタート
+  server.begin();
+    
 }
 void loop() {
   //  クライアントからの要求を処理する
-  Server.handleClient();
+  if (!client.connected()){
+    if (client.connect(host, port)) {
+      Serial.println("Connected to server");
+    } else {
+      Serial.println("Connection to server failed");
+    }
+  }
+
+  if (client.connected()){
+    //esp_task_wdt_reset();
+    delay(1);
+    if (client.available()) {
+      String message = client.readStringUntil('\n'); // 改行文字まで読み込む
+      Serial.print("Received message: ");
+      Serial.println(message);
+      if(message == "Up"){
+        UpSendMessage();
+      }else if(message == "Stop"){
+        StopSendMessage();
+      }else if(message == "Down"){
+        DownSendMessage();
+      }else if(message == "Light"){
+        LightSendMessage();
+      }
+      // client.write("Command Received");
+    }
+  }
+  delay(100);
 }
-
-
