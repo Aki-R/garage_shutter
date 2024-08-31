@@ -2,7 +2,9 @@
 #include "ESPAsyncWebServer.h"
 #include "SPIFFS.h"
 #include "secrets.h"  // add WLAN Credentials and Host info in here.
-#include "esp_task_wdt.h"
+//#include "esp_task_wdt.h"
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 
 #define Uppin 32
 #define Stoppin 33
@@ -76,6 +78,13 @@ void LightSendMessage() {
   }
 }
 
+///ESP32 Monitoring////
+// Google Apps ScriptのURL
+const char* googleScriptURL = "https://script.google.com/macros/s/AKfycbxK2bxQGBxnNVoMqabIdiQLv2ISO7PKYCQcoKztlI27feLqMungcLlepI5CKpEtKaFA/exec";
+//const char* googleScriptURL = "https://script.google.com/macros/s/  Deproy_ID  /exec";
+
+
+
 //  メインプログラム
 void setup() {
   pinMode(Uppin, OUTPUT);
@@ -96,18 +105,6 @@ void setup() {
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
   }
-
-  /*
-  // Watch Dog Setup
-  config.timeout_ms = 10000;
-  config.trigger_panic = true;
-  config.idle_core_mask = (1 << portNUM_PROCESSORS) - 1; //All processor
-  // esp_task_wdt_deinit();
-  // esp_task_wdt_init(&config); // タイムアウトを設定し、システムリセットを有効にする
-  // esp_task_wdt_add(NULL);
-  // esp_task_wdt_reset();
-  Serial.println("WDT start");
-*/
   
   //  無線 LAN に接続
   WiFi.mode(WIFI_STA);        
@@ -159,12 +156,17 @@ void setup() {
 
   // サーバースタート
   server.begin();
+
+  // Google Spread Sheetにデータの送信
+  sendDataToGoogleSheets("Init");
     
 }
 void loop() {
   Serial.println("loop start");
+  sendDataToGoogleSheets("Start");
   //  クライアントからの要求を処理する
   if (!client.connected()){
+      sendDataToGoogleSheets("Client Connected Fail");
     if (client.connect(host, port)) {
       Serial.println("Connected to server");
     } else {
@@ -173,9 +175,12 @@ void loop() {
   }
 
   if (client.connected()){
+    sendDataToGoogleSheets("Client Connected Succeeded");
+    Serial.println("Client Conected");
     //esp_task_wdt_reset();
     delay(1);
     if (client.available()) {
+      sendDataToGoogleSheets("Client Available Succeeded");
       String message = client.readStringUntil('\n'); // 改行文字まで読み込む
       Serial.print("Received message: ");
       Serial.println(message);
@@ -189,7 +194,39 @@ void loop() {
         LightSendMessage();
       }
       // client.write("Command Received");
+    } else {
+    sendDataToGoogleSheets("Client Available Failed");
     }
   }
   delay(100);
+}
+
+//Google SpreadへのStatus送信関数
+void sendDataToGoogleSheets(const char* Status) {
+    HTTPClient http; // HTTPClientオブジェクトを作成
+    String url = googleScriptURL; // Google Apps ScriptのURLを設定
+
+    // JSONデータの作成
+    String jsonData;
+    StaticJsonDocument<200> doc;
+    doc["Status"] = Status; // Statusの値をJSONに追加
+    serializeJson(doc, jsonData); // JSONデータを文字列にシリアライズ
+
+    http.begin(url); // HTTP接続を開始
+    http.addHeader("Content-Type", "application/json"); // ヘッダーにContent-Typeを設定
+
+    // HTTP POSTリクエストを送信
+    int httpResponseCode = http.POST(jsonData);
+
+    // レスポンスコードをチェック
+    if (httpResponseCode > 0) {
+      String response = http.getString(); // レスポンスを取得
+      Serial.println(httpResponseCode); // レスポンスコードをシリアルモニタに出力
+      Serial.println(response); // レスポンス内容をシリアルモニタに出力
+    } else {
+      Serial.print("Error on sending POST: "); // エラーメッセージをシリアルモニタに出力
+      Serial.println(httpResponseCode);
+    }
+
+    http.end(); // HTTP接続を終了
 }
