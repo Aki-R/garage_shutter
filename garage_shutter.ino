@@ -102,10 +102,10 @@ void setup() {
   config.timeout_ms = 10000;
   config.trigger_panic = true;
   config.idle_core_mask = (1 << portNUM_PROCESSORS) - 1; //All processor
-  esp_task_wdt_deinit();
-  esp_task_wdt_init(&config); // タイムアウトを設定し、システムリセットを有効にする
-  esp_task_wdt_add(NULL);
-  esp_task_wdt_reset();
+  // esp_task_wdt_deinit();
+  // esp_task_wdt_init(&config); // タイムアウトを設定し、システムリセットを有効にする
+  // esp_task_wdt_add(NULL);
+  // esp_task_wdt_reset();
   Serial.println("WDT start");
 */
   
@@ -135,41 +135,25 @@ void setup() {
 
   // UPボタンが押された時のレスポンス
   server.on("/up", HTTP_GET, [](AsyncWebServerRequest *request){
-    digitalWrite(Uppin, LOW);    
-    delay(500);
-    digitalWrite(Uppin, HIGH);
+    UpSendMessage();
     request->send(SPIFFS, "/index.html", String(), false, processor);
   });
   
   // STOPボタンが押された時のレスポンス
   server.on("/stop", HTTP_GET, [](AsyncWebServerRequest *request){
-    digitalWrite(Stoppin, LOW);    
-    delay(500);
-    digitalWrite(Stoppin, HIGH);
+    StopSendMessage();
     request->send(SPIFFS, "/index.html", String(), false, processor);
   });
 
   // DOWNボタンが押された時のレスポンス
   server.on("/down", HTTP_GET, [](AsyncWebServerRequest *request){
-    digitalWrite(Downpin, LOW);    
-    delay(500);
-    digitalWrite(Downpin, HIGH); 
+    DownSendMessage();
     request->send(SPIFFS, "/index.html", String(), false, processor);
   });
 
   // LEDボタンが押された時のレスポンス
   server.on("/led", HTTP_GET, [](AsyncWebServerRequest *request){
-    static bool toggle = true;
-    if(toggle)
-    {
-      digitalWrite(Lighting, HIGH);
-      toggle=false;
-    }
-    else
-    {
-      digitalWrite(Lighting, LOW);
-      toggle=true;
-    }
+    LightSendMessage();
     request->send(SPIFFS, "/index.html", String(), false, processor);
   });
 
@@ -189,7 +173,7 @@ void loop() {
   }
 
   if (client.connected()){
-    esp_task_wdt_reset();
+    //esp_task_wdt_reset();
     delay(1);
     if (client.available()) {
       String message = client.readStringUntil('\n'); // 改行文字まで読み込む
