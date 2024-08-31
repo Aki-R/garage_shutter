@@ -82,6 +82,9 @@ void LightSendMessage() {
 // Google Apps ScriptのURL
 const char* googleScriptURL = gooScrURL;
 
+//5分間計測用関数
+unsigned long lastAvailableCheck = 0;
+
 
 //  メインプログラム
 void setup() {
@@ -196,10 +199,11 @@ void loop() {
     } else {
     sendDataToGoogleSheets("Client Available Failed");
     // Check if 5 minutes have passed since the last available check
-    if (millis() - lastAvailableCheck > 300000) { // 300,000 milliseconds = 5 minutes
-      Serial.println("Client not available for 5 minutes, reconnecting...");
-      client.stop();
-      lastAvailableCheck = millis(); // Reset the timer
+     if (millis() - lastAvailableCheck > 300000) { // 300,000 milliseconds = 5 minutes
+       Serial.println("Client not available for 5 minutes, reconnecting...");
+       client.stop();
+       lastAvailableCheck = millis(); // Reset the timer
+     }
     }
   }
   delay(100);
