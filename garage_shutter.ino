@@ -2,7 +2,7 @@
 #include "ESPAsyncWebServer.h"
 #include "SPIFFS.h"
 #include "secrets.h"  // add WLAN Credentials and Host info in here.
-#include "esp_task_wdt.h"
+// #include "esp_task_wdt.h"
 
 #define Uppin 32
 #define Stoppin 33
@@ -23,7 +23,7 @@ const int port = PORT;
 const char* host = HOST;
 
 // Watchdogの設定
-esp_task_wdt_config_t config;
+// esp_task_wdt_config_t config;
 
 // 実際のピン出力によってhtmlファイル内のSTATEの文字を変える
 String processor(const String& var){
@@ -94,14 +94,14 @@ void setup() {
     return;
   }
   // Watch Dog Setup
-  config.timeout_ms = 10000;
-  config.trigger_panic = true;
-  config.idle_core_mask = (1 << portNUM_PROCESSORS) - 1; //All processor
+  // config.timeout_ms = 100000;
+  // config.trigger_panic = true;
+  // config.idle_core_mask = (1 << portNUM_PROCESSORS) - 1; //All processor
   // esp_task_wdt_deinit();
   // esp_task_wdt_init(&config); // タイムアウトを設定し、システムリセットを有効にする
   // esp_task_wdt_add(NULL);
   // esp_task_wdt_reset();
-  Serial.println("WDT start");
+  // Serial.println("WDT start");
   //  無線 LAN に接続
   WiFi.mode(WIFI_STA);        
   WiFi.begin(SSID, PASS);             
