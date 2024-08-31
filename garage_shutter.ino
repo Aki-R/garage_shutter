@@ -179,6 +179,7 @@ void loop() {
     delay(1);
     if (client.available()) {
       sendDataToGoogleSheets("Client Available Succeeded");
+      lastAvailableCheck = millis(); // Reset the timer
       String message = client.readStringUntil('\n'); // 改行文字まで読み込む
       Serial.print("Received message: ");
       Serial.println(message);
@@ -194,6 +195,11 @@ void loop() {
       // client.write("Command Received");
     } else {
     sendDataToGoogleSheets("Client Available Failed");
+    // Check if 5 minutes have passed since the last available check
+    if (millis() - lastAvailableCheck > 300000) { // 300,000 milliseconds = 5 minutes
+      Serial.println("Client not available for 5 minutes, reconnecting...");
+      client.stop();
+      lastAvailableCheck = millis(); // Reset the timer
     }
   }
   delay(100);
