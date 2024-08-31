@@ -1,1 +1,5 @@
-![IMG_9076](https://github.com/user-attachments/assets/9791cd06-c323-4646-afba-d482622b3e0f)
+ガレージのシャッターをスマホから動かしたいぜ
+
+以下配線図
+![image](https://github.com/user-attachments/assets/e17990d8-8aad-49cd-ba67-b68ae87d894a)
+
