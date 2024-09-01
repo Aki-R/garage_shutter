@@ -3,8 +3,6 @@
 #include "SPIFFS.h"
 #include "secrets.h"  // add WLAN Credentials and Host info in here.
 //#include "esp_task_wdt.h"
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
 
 #define Uppin 32
 #define Stoppin 33
@@ -77,10 +75,6 @@ void LightSendMessage() {
     digitalWrite(Lighting, HIGH);
   }
 }
-
-///ESP32 Monitoring////
-// Google Apps ScriptのURL
-const char* googleScriptURL = gooScrURL;
 
 //5分間計測用関数
 unsigned long lastAvailableCheck = 0;
@@ -157,17 +151,13 @@ void setup() {
 
   // サーバースタート
   server.begin();
-
-  // Google Spread Sheetにデータの送信
-  sendDataToGoogleSheets("Init");
     
 }
 void loop() {
   Serial.println("loop start");
-  sendDataToGoogleSheets("Start");
   //  クライアントからの要求を処理する
   if (!client.connected()){
-      sendDataToGoogleSheets("Client Connected Fail");
+      Serial.println("Client_Connected Fail");
     if (client.connect(host, port)) {
       Serial.println("Connected to server");
     } else {
@@ -176,12 +166,11 @@ void loop() {
   }
 
   if (client.connected()){
-    sendDataToGoogleSheets("Client Connected Succeeded");
     Serial.println("Client Conected");
     //esp_task_wdt_reset();
     delay(1);
     if (client.available()) {
-      sendDataToGoogleSheets("Client Available Succeeded");
+      Serial.println("Client_Available Succeeded");
       lastAvailableCheck = millis(); // Reset the timer
       String message = client.readStringUntil('\n'); // 改行文字まで読み込む
       Serial.print("Received message: ");
@@ -195,46 +184,18 @@ void loop() {
       }else if(message == "Light"){
         LightSendMessage();
       }
-      // client.write("Command Received");
+       client.write("Command Received");
     } else {
-    sendDataToGoogleSheets("Client Available Failed");
+    Serial.println("Client_Available Failed");
     // Check if 5 minutes have passed since the last available check
      if (millis() - lastAvailableCheck > 300000) { // 300,000 milliseconds = 5 minutes
        Serial.println("Client not available for 5 minutes, reconnecting...");
        client.stop();
        lastAvailableCheck = millis(); // Reset the timer
+     }else if (millis() - lastAvailableCheck < 0) { // mills over clock => Reset the timer
+       lastAvailableCheck = millis(); // Reset the timer
      }
     }
   }
   delay(100);
-}
-
-//Google SpreadへのStatus送信関数
-void sendDataToGoogleSheets(const char* Status) {
-    HTTPClient http; // HTTPClientオブジェクトを作成
-    String url = googleScriptURL; // Google Apps ScriptのURLを設定
-
-    // JSONデータの作成
-    String jsonData;
-    StaticJsonDocument<200> doc;
-    doc["Status"] = Status; // Statusの値をJSONに追加
-    serializeJson(doc, jsonData); // JSONデータを文字列にシリアライズ
-
-    http.begin(url); // HTTP接続を開始
-    http.addHeader("Content-Type", "application/json"); // ヘッダーにContent-Typeを設定
-
-    // HTTP POSTリクエストを送信
-    int httpResponseCode = http.POST(jsonData);
-
-    // レスポンスコードをチェック
-    if (httpResponseCode > 0) {
-      String response = http.getString(); // レスポンスを取得
-      Serial.println(httpResponseCode); // レスポンスコードをシリアルモニタに出力
-      Serial.println(response); // レスポンス内容をシリアルモニタに出力
-    } else {
-      Serial.print("Error on sending POST: "); // エラーメッセージをシリアルモニタに出力
-      Serial.println(httpResponseCode);
-    }
-
-    http.end(); // HTTP接続を終了
 }
