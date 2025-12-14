@@ -225,6 +225,12 @@ void cleanOldLogs() {
   }
 }
 
+void redirectToIndex(AsyncWebServerRequest *request) {
+  AsyncWebServerResponse *res = request->beginResponse(303); // GETでも303でOK
+  res->addHeader("Location", "/");
+  request->send(res);
+}
+
 // ---------- setup / loop ----------
 void setup() {
   pinMode(Uppin, OUTPUT);    digitalWrite(Uppin, HIGH);
@@ -313,25 +319,25 @@ void setup() {
   server.on("/up", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     UpSendMessage();
-    request->send(SPIFFS, "/index.html", String(), false, processor);
+    redirectToIndex(request);
   });
 
   server.on("/stop", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     StopSendMessage();
-    request->send(SPIFFS, "/index.html", String(), false, processor);
+    redirectToIndex(request);
   });
 
   server.on("/down", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     DownSendMessage();
-    request->send(SPIFFS, "/index.html", String(), false, processor);
+    redirectToIndex(request);
   });
 
   server.on("/led", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     LightSendMessage();
-    request->send(SPIFFS, "/index.html", String(), false, processor);
+    redirectToIndex(request);
   });
 
   // --- ログ一覧ページ ---
