@@ -2,3 +2,4 @@
 #define PASS "Password for SSID"	// replace MyPassword with your WiFi password
 #define HOST "XXX.XXX.XXX.XXX"
 #define PORT XXXX
+#define DISCORD_WEBHOOK_URL "https://discordapp.com/api/webhooks/...."
