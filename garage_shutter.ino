@@ -6,6 +6,8 @@
 #include <ctime>
 #include <vector>
 #include <algorithm>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 
 #define Uppin 32
 #define Stoppin 33
@@ -231,6 +233,32 @@ void redirectToIndex(AsyncWebServerRequest *request) {
   request->send(res);
 }
 
+void sendDiscordUpNotify() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  WiFiClientSecure client;
+  client.setInsecure(); // 証明書チェック無効（ESP32定番）
+
+  HTTPClient https;
+  if (!https.begin(client, DISCORD_WEBHOOK_URL)) {
+    Serial.println("Discord webhook begin failed");
+    return;
+  }
+
+  https.addHeader("Content-Type", "application/json");
+
+  // Discord用JSON
+  String payload =
+  "{"
+  "\"content\": \"🚪 **ガレージが開けられました**\""
+  "}";
+
+  int httpCode = https.POST(payload);
+  Serial.printf("Discord notify result: %d\n", httpCode);
+
+  https.end();
+}
+
 // ---------- setup / loop ----------
 void setup() {
   pinMode(Uppin, OUTPUT);    digitalWrite(Uppin, HIGH);
@@ -319,6 +347,7 @@ void setup() {
   server.on("/up", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     UpSendMessage();
+    sendDiscordUpNotify();
     redirectToIndex(request);
   });
 
