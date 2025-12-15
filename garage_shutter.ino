@@ -6,6 +6,8 @@
 #include <ctime>
 #include <vector>
 #include <algorithm>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 
 #define Uppin 32
 #define Stoppin 33
@@ -225,6 +227,38 @@ void cleanOldLogs() {
   }
 }
 
+void redirectToIndex(AsyncWebServerRequest *request) {
+  AsyncWebServerResponse *res = request->beginResponse(303); // GETでも303でOK
+  res->addHeader("Location", "/");
+  request->send(res);
+}
+
+void sendDiscordUpNotify() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  WiFiClientSecure client;
+  client.setInsecure(); // 証明書チェック無効（ESP32定番）
+
+  HTTPClient https;
+  if (!https.begin(client, DISCORD_WEBHOOK_URL)) {
+    Serial.println("Discord webhook begin failed");
+    return;
+  }
+
+  https.addHeader("Content-Type", "application/json");
+
+  // Discord用JSON
+  String payload =
+  "{"
+  "\"content\": \"🚪 **ガレージが開けられました**\""
+  "}";
+
+  int httpCode = https.POST(payload);
+  Serial.printf("Discord notify result: %d\n", httpCode);
+
+  https.end();
+}
+
 // ---------- setup / loop ----------
 void setup() {
   pinMode(Uppin, OUTPUT);    digitalWrite(Uppin, HIGH);
@@ -313,25 +347,26 @@ void setup() {
   server.on("/up", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     UpSendMessage();
-    request->send(SPIFFS, "/index.html", String(), false, processor);
+    sendDiscordUpNotify();
+    redirectToIndex(request);
   });
 
   server.on("/stop", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     StopSendMessage();
-    request->send(SPIFFS, "/index.html", String(), false, processor);
+    redirectToIndex(request);
   });
 
   server.on("/down", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     DownSendMessage();
-    request->send(SPIFFS, "/index.html", String(), false, processor);
+    redirectToIndex(request);
   });
 
   server.on("/led", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     LightSendMessage();
-    request->send(SPIFFS, "/index.html", String(), false, processor);
+    redirectToIndex(request);
   });
 
   // --- ログ一覧ページ ---
