@@ -317,7 +317,95 @@ void setup() {
     Serial.printf(" - %s\n", USERS[i].username);
   }
 
-  // ---- 操作ページ（保護）----
+  // ============================================================
+  // iPhone ショートカット用 API エンドポイント
+  // ============================================================
+
+  // --- API: ガレージ開ける ---
+  server.on("/api/up", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!request->authenticate(USERS[0].username, USERS[0].password)) {
+      request->requestAuthentication();
+      return;
+    }
+
+    String username = USERS[0].username;
+    if (request->hasParam("user")) {
+      username = request->getParam("user")->value();
+    }
+
+    UpSendMessage();
+    sendDiscordUpNotify(username);
+    
+    String response = "{\"status\":\"success\",\"action\":\"up\",\"user\":\"" + username + "\"}";
+    request->send(200, "application/json", response);
+  });
+
+  // --- API: ガレージ閉める ---
+  server.on("/api/down", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!request->authenticate(USERS[0].username, USERS[0].password)) {
+      request->requestAuthentication();
+      return;
+    }
+
+    String username = USERS[0].username;
+    if (request->hasParam("user")) {
+      username = request->getParam("user")->value();
+    }
+
+    DownSendMessage();
+    
+    String response = "{\"status\":\"success\",\"action\":\"down\",\"user\":\"" + username + "\"}";
+    request->send(200, "application/json", response);
+  });
+
+  // --- API: ガレージ停止 ---
+  server.on("/api/stop", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!request->authenticate(USERS[0].username, USERS[0].password)) {
+      request->requestAuthentication();
+      return;
+    }
+
+    String username = USERS[0].username;
+    if (request->hasParam("user")) {
+      username = request->getParam("user")->value();
+    }
+
+    StopSendMessage();
+    
+    String response = "{\"status\":\"success\",\"action\":\"stop\",\"user\":\"" + username + "\"}";
+    request->send(200, "application/json", response);
+  });
+
+  // --- API: 照明トグル ---
+  server.on("/api/light", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!request->authenticate(USERS[0].username, USERS[0].password)) {
+      request->requestAuthentication();
+      return;
+    }
+
+    String username = USERS[0].username;
+    if (request->hasParam("user")) {
+      username = request->getParam("user")->value();
+    }
+
+    LightSendMessage();
+    String state = digitalRead(Lighting) ? "ON" : "OFF";
+    
+    String response = "{\"status\":\"success\",\"action\":\"light\",\"state\":\"" + state + "\",\"user\":\"" + username + "\"}";
+    request->send(200, "application/json", response);
+  });
+
+  // --- API: ステータス取得（認証なし）---
+  server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request){
+    String lightState = digitalRead(Lighting) ? "ON" : "OFF";
+    String response = "{\"status\":\"success\",\"light\":\"" + lightState + "\"}";
+    request->send(200, "application/json", response);
+  });
+
+  // ============================================================
+  // Web UI エンドポイント（既存）
+  // ============================================================
+
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     request->send(SPIFFS, "/index.html", String(), false, processor);
@@ -467,6 +555,8 @@ void setup() {
   });
 
   server.begin();
+  Serial.println("Server started with API endpoints!");
+  Serial.println("API Base URL: http://" + WiFi.localIP().toString() + "/api/");
 }
 
 unsigned long lastCleanup = 0;
