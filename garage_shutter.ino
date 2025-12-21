@@ -163,7 +163,8 @@ String sanitizeLogFilename(String name) {
 }
 
 // ---------- 認証 & ログ記録 ----------
-void writeAccessLog(AsyncWebServerRequest *request) {
+// ログ記録関数（ユーザー名を明示的に指定可能）
+void writeAccessLog(AsyncWebServerRequest *request, const String& username = "") {
   String url = request->url();
   if (url.endsWith(".css") || url.endsWith(".ico")) return;
 
@@ -172,10 +173,12 @@ void writeAccessLog(AsyncWebServerRequest *request) {
   char filename[32];
   strftime(filename, sizeof(filename), "/log_%Y%m%d.txt", t);
 
-  String username = getCurrentUsername(request);
+  // ユーザー名が指定されていればそれを使用、なければセッションから取得
+  String logUsername = username.length() > 0 ? username : getCurrentUsername(request);
+  
   String logEntry = "[" + String(asctime(t));
   logEntry.trim();
-  logEntry += "] User: " + username;
+  logEntry += "] User: " + logUsername;
   logEntry += " IP: " + request->client()->remoteIP().toString();
   logEntry += " URL: " + url + "\n";
 
@@ -320,11 +323,8 @@ void setup() {
   // iPhone ショートカット用 API エンドポイント（修正版）
   // ============================================================
 
-  // API用の認証ヘルパー関数（全ユーザー対応 + ログ記録）
+  // API用の認証ヘルパー関数（全ユーザー対応）
   auto authenticateApiUser = [](AsyncWebServerRequest *request) -> String {
-    // ログを記録
-    writeAccessLog(request);
-    
     // Authorization ヘッダーを取得
     if (!request->hasHeader("Authorization")) {
       return "";
@@ -350,9 +350,13 @@ void setup() {
     String username = authenticateApiUser(request);
     
     if (username == "") {
+      writeAccessLog(request, "Unauthorized");  // 認証失敗をログ記録
       request->requestAuthentication();
       return;
     }
+
+    // 認証成功後、ユーザー名付きでログ記録
+    writeAccessLog(request, username);
 
     // userパラメータがあれば上書き（オプション）
     if (request->hasParam("user")) {
@@ -373,9 +377,12 @@ void setup() {
     String username = authenticateApiUser(request);
     
     if (username == "") {
+      writeAccessLog(request, "Unauthorized");
       request->requestAuthentication();
       return;
     }
+
+    writeAccessLog(request, username);
 
     if (request->hasParam("user")) {
       username = request->getParam("user")->value();
@@ -394,9 +401,12 @@ void setup() {
     String username = authenticateApiUser(request);
     
     if (username == "") {
+      writeAccessLog(request, "Unauthorized");
       request->requestAuthentication();
       return;
     }
+
+    writeAccessLog(request, username);
 
     if (request->hasParam("user")) {
       username = request->getParam("user")->value();
@@ -415,9 +425,12 @@ void setup() {
     String username = authenticateApiUser(request);
     
     if (username == "") {
+      writeAccessLog(request, "Unauthorized");
       request->requestAuthentication();
       return;
     }
+
+    writeAccessLog(request, username);
 
     if (request->hasParam("user")) {
       username = request->getParam("user")->value();
@@ -434,7 +447,7 @@ void setup() {
 
   // --- API: ステータス取得（認証なし、ログ記録あり）---
   server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request){
-    writeAccessLog(request);
+    writeAccessLog(request, "Public");
     
     String lightState = digitalRead(Lighting) ? "ON" : "OFF";
     String response = "{\"status\":\"success\",\"light\":\"" + lightState + "\"}";
