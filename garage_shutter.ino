@@ -107,6 +107,7 @@ bool isLoggedIn(AsyncWebServerRequest *request) {
   return findSessionIndexById(sid) >= 0;
 }
 
+// 現在のユーザー名を取得する関数
 String getCurrentUsername(AsyncWebServerRequest *request) {
   cleanupExpiredSessions();
   String sid = getCookie(request, "GCSESSID");
@@ -145,6 +146,7 @@ void clearSession(AsyncWebServerRequest *request) {
   request->send(res);
 }
 
+// ---- ログファイル名サニタイズ ----
 String sanitizeLogFilename(String name) {
   if (name.startsWith("/")) name = name.substring(1);
   if (name.indexOf('/') != -1) return "";
@@ -198,6 +200,7 @@ bool checkAuth(AsyncWebServerRequest *request) {
   return false;
 }
 
+// ---------- HTMLテンプレ置換 ----------
 String processor(const String& var) {
   if (var == "STATE") {
     ledState = digitalRead(Lighting) ? "ON" : "OFF";
@@ -212,6 +215,7 @@ void UpSendMessage()   { digitalWrite(Uppin, LOW); delay(500); digitalWrite(Uppi
 void DownSendMessage() { digitalWrite(Downpin, LOW); delay(500); digitalWrite(Downpin, HIGH); }
 void LightSendMessage(){ digitalWrite(Lighting, !digitalRead(Lighting)); }
 
+// ---------- SPIFFSユーティリティ ----------
 void listSpiffsFiles() {
   File root = SPIFFS.open("/");
   if (!root || !root.isDirectory()) {
@@ -250,6 +254,7 @@ void redirectToIndex(AsyncWebServerRequest *request) {
   request->send(res);
 }
 
+// Discord通知関数（ユーザー名を含める）
 void sendDiscordUpNotify(const String& username) {
   if (WiFi.status() != WL_CONNECTED) return;
 
@@ -275,6 +280,7 @@ void sendDiscordUpNotify(const String& username) {
   https.end();
 }
 
+// ---------- setup / loop ----------
 void setup() {
   pinMode(Uppin, OUTPUT);    digitalWrite(Uppin, HIGH);
   pinMode(Downpin, OUTPUT);  digitalWrite(Downpin, HIGH);
@@ -305,6 +311,7 @@ void setup() {
   cleanOldLogs();
   listSpiffsFiles();
 
+  // ログイン中のユーザー一覧をシリアルに表示（デバッグ用）
   Serial.printf("Registered users: %d\n", USER_COUNT);
   for (int i = 0; i < USER_COUNT; i++) {
     Serial.printf(" - %s\n", USERS[i].username);
@@ -404,6 +411,7 @@ void setup() {
     request->send(SPIFFS, "/index.html", String(), false, processor);
   });
 
+  // ---- ログインページ（公開, GET）----
   server.on("/login", HTTP_GET, [](AsyncWebServerRequest *request){
     if (isLoggedIn(request)) {
       auto *res = request->beginResponse(303);
@@ -416,12 +424,14 @@ void setup() {
     request->send(res);
   });
 
+  // ---- ログイン処理（公開, POST）----
   server.on("/login", HTTP_POST, [](AsyncWebServerRequest *request){
     String u = request->arg("username");
     String p = request->arg("password");
     String redirect = request->hasParam("redirect", true) ? request->getParam("redirect", true)->value() : "/";
     if (!redirect.startsWith("/")) redirect = "/";
 
+    // 複数ユーザー認証
     if (authenticateUser(u, p)) {
       Serial.printf("Login success: %s\n", u.c_str());
       startSession(request, u, redirect.length() ? redirect : "/");
@@ -433,10 +443,12 @@ void setup() {
     }
   });
 
+  // ---- ログアウト（公開, GET）----
   server.on("/logout", HTTP_GET, [](AsyncWebServerRequest *request){
     clearSession(request);
   });
 
+  // ---- 公開アセット ----
   server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(SPIFFS, "/style.css", "text/css");
   });
@@ -445,8 +457,10 @@ void setup() {
     request->send(SPIFFS, "/login.css", "text/css");
   });
 
+  // ---- 制御系（保護）----
   server.on("/up", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
+    
     String username = getCurrentUsername(request);
     UpSendMessage();
     sendDiscordUpNotify(username);
@@ -471,6 +485,7 @@ void setup() {
     redirectToIndex(request);
   });
 
+  // --- ログ一覧ページ ---
   server.on("/logs", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
 
@@ -490,6 +505,7 @@ void setup() {
     request->send(200, "text/html; charset=UTF-8", html);
   });
 
+  // --- ログファイル表示 ---
   server.on("/view", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
 
@@ -520,6 +536,7 @@ void setup() {
     request->send(200, "text/html; charset=UTF-8", html);
   });
 
+  // --- ログダウンロード ---
   server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     if (!request->hasParam("file")) {
@@ -543,7 +560,7 @@ void setup() {
 }
 
 unsigned long lastCleanup = 0;
-const unsigned long cleanupInterval = 3600000;
+const unsigned long cleanupInterval = 3600000; // 1時間
 
 void loop() {
   if (millis() - lastCleanup > cleanupInterval) {
