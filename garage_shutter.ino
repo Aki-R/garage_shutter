@@ -20,12 +20,13 @@ AsyncWebServer server(80);
 // ---- セッション（複数同時OK）----
 struct Session {
   String id;
+  String username;
   unsigned long startMs;
 };
 std::vector<Session> g_sessions;
 
 const unsigned long SESSION_TTL_MS = 24UL * 60UL * 60UL * 1000UL; // 24h
-const size_t MAX_SESSIONS = 32; // 念のため上限
+const size_t MAX_SESSIONS = 32;
 
 // ---------- ユーティリティ ----------
 String urlEncode(const String& s) {
@@ -55,7 +56,7 @@ String makeSessionId() {
 
 String getCookie(AsyncWebServerRequest *request, const String& key) {
   if (!request->hasHeader("Cookie")) return "";
-  const AsyncWebHeader* h = request->getHeader("Cookie"); // ← const を付ける
+  const AsyncWebHeader* h = request->getHeader("Cookie");
   String cookie = h->value();
   int p = 0;
   while (p < cookie.length()) {
@@ -71,6 +72,15 @@ String getCookie(AsyncWebServerRequest *request, const String& key) {
   return "";
 }
 
+// ---- ユーザー認証（複数ユーザー対応）----
+bool authenticateUser(const String& username, const String& password) {
+  for (int i = 0; i < USER_COUNT; i++) {
+    if (username == USERS[i].username && password == USERS[i].password) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // ---- セッション掃除 & 検索 ----
 void cleanupExpiredSessions() {
@@ -97,17 +107,28 @@ bool isLoggedIn(AsyncWebServerRequest *request) {
   return findSessionIndexById(sid) >= 0;
 }
 
-void startSession(AsyncWebServerRequest *request, const String& redirectTo = "/") {
+// 現在のユーザー名を取得する関数
+String getCurrentUsername(AsyncWebServerRequest *request) {
   cleanupExpiredSessions();
-  // セッション作成
-  Session s{ makeSessionId(), millis() };
+  String sid = getCookie(request, "GCSESSID");
+  if (sid == "") return "Unknown";
+  
+  int idx = findSessionIndexById(sid);
+  if (idx >= 0) {
+    return g_sessions[idx].username;
+  }
+  return "Unknown";
+}
+
+void startSession(AsyncWebServerRequest *request, const String& username, const String& redirectTo = "/") {
+  cleanupExpiredSessions();
+  Session s{ makeSessionId(), username, millis() };
   if (g_sessions.size() >= MAX_SESSIONS) {
-    // 古い順に1つ削除（先頭を古いとして扱う）
     g_sessions.erase(g_sessions.begin());
   }
   g_sessions.push_back(s);
 
-  AsyncWebServerResponse *res = request->beginResponse(303); // POST→GETは303
+  AsyncWebServerResponse *res = request->beginResponse(303);
   res->addHeader("Set-Cookie", "GCSESSID=" + s.id + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400");
   res->addHeader("Location", redirectTo);
   request->send(res);
@@ -125,7 +146,7 @@ void clearSession(AsyncWebServerRequest *request) {
   request->send(res);
 }
 
-// ---- ログファイル名サニタイズ（/混入やパストラバーサル防止）----
+// ---- ログファイル名サニタイズ ----
 String sanitizeLogFilename(String name) {
   if (name.startsWith("/")) name = name.substring(1);
   if (name.indexOf('/') != -1) return "";
@@ -142,7 +163,8 @@ String sanitizeLogFilename(String name) {
 }
 
 // ---------- 認証 & ログ記録 ----------
-void writeAccessLog(AsyncWebServerRequest *request) {
+// ログ記録関数（ユーザー名を明示的に指定可能）
+void writeAccessLog(AsyncWebServerRequest *request, const String& username = "") {
   String url = request->url();
   if (url.endsWith(".css") || url.endsWith(".ico")) return;
 
@@ -151,9 +173,13 @@ void writeAccessLog(AsyncWebServerRequest *request) {
   char filename[32];
   strftime(filename, sizeof(filename), "/log_%Y%m%d.txt", t);
 
+  // ユーザー名が指定されていればそれを使用、なければセッションから取得
+  String logUsername = username.length() > 0 ? username : getCurrentUsername(request);
+  
   String logEntry = "[" + String(asctime(t));
   logEntry.trim();
-  logEntry += "] IP: " + request->client()->remoteIP().toString();
+  logEntry += "] User: " + logUsername;
+  logEntry += " IP: " + request->client()->remoteIP().toString();
   logEntry += " URL: " + url + "\n";
 
   File logFile = SPIFFS.open(filename, FILE_APPEND);
@@ -170,7 +196,6 @@ bool checkAuth(AsyncWebServerRequest *request) {
   writeAccessLog(request);
   if (isLoggedIn(request)) return true;
 
-  // 未ログイン → /login へ。元のURLに戻すため redirect クエリを付与
   String redirectTo = "/login?redirect=" + urlEncode(request->url());
   AsyncWebServerResponse *res = request->beginResponse(302);
   res->addHeader("Location", redirectTo);
@@ -208,7 +233,6 @@ void listSpiffsFiles() {
   }
 }
 
-// --- 古いログ削除 ---
 void cleanOldLogs() {
   File root = SPIFFS.open("/");
   if (!root || !root.isDirectory()) return;
@@ -228,16 +252,17 @@ void cleanOldLogs() {
 }
 
 void redirectToIndex(AsyncWebServerRequest *request) {
-  AsyncWebServerResponse *res = request->beginResponse(303); // GETでも303でOK
+  AsyncWebServerResponse *res = request->beginResponse(303);
   res->addHeader("Location", "/");
   request->send(res);
 }
 
-void sendDiscordUpNotify() {
+// Discord通知関数（ユーザー名を含める）
+void sendDiscordUpNotify(const String& username) {
   if (WiFi.status() != WL_CONNECTED) return;
 
   WiFiClientSecure client;
-  client.setInsecure(); // 証明書チェック無効（ESP32定番）
+  client.setInsecure();
 
   HTTPClient https;
   if (!https.begin(client, DISCORD_WEBHOOK_URL)) {
@@ -247,10 +272,9 @@ void sendDiscordUpNotify() {
 
   https.addHeader("Content-Type", "application/json");
 
-  // Discord用JSON
   String payload =
   "{"
-  "\"content\": \"🚪 **ガレージが開けられました**\""
+  "\"content\": \"🚪 **ガレージが開けられました**\\n👤 操作者: " + username + "\""
   "}";
 
   int httpCode = https.POST(payload);
@@ -290,7 +314,150 @@ void setup() {
   cleanOldLogs();
   listSpiffsFiles();
 
-  // ---- 操作ページ（保護）----
+  Serial.printf("Registered users: %d\n", USER_COUNT);
+  for (int i = 0; i < USER_COUNT; i++) {
+    Serial.printf(" - %s\n", USERS[i].username);
+  }
+
+  // ============================================================
+  // iPhone ショートカット用 API エンドポイント（修正版）
+  // ============================================================
+
+  // API用の認証ヘルパー関数（全ユーザー対応）
+  auto authenticateApiUser = [](AsyncWebServerRequest *request) -> String {
+    // Authorization ヘッダーを取得
+    if (!request->hasHeader("Authorization")) {
+      return "";
+    }
+    
+    String auth = request->header("Authorization");
+    if (!auth.startsWith("Basic ")) {
+      return "";
+    }
+    
+    // Basic認証の検証（全ユーザーをチェック）
+    for (int i = 0; i < USER_COUNT; i++) {
+      if (request->authenticate(USERS[i].username, USERS[i].password)) {
+        return String(USERS[i].username);
+      }
+    }
+    
+    return "";  // 認証失敗
+  };
+
+  // --- API: ガレージ開ける ---
+  server.on("/api/up", HTTP_POST, [authenticateApiUser](AsyncWebServerRequest *request){
+    String username = authenticateApiUser(request);
+    
+    if (username == "") {
+      writeAccessLog(request, "Unauthorized");  // 認証失敗をログ記録
+      request->requestAuthentication();
+      return;
+    }
+
+    // 認証成功後、ユーザー名付きでログ記録
+    writeAccessLog(request, username);
+
+    // userパラメータがあれば上書き（オプション）
+    if (request->hasParam("user")) {
+      username = request->getParam("user")->value();
+    }
+
+    UpSendMessage();
+    sendDiscordUpNotify(username);
+    
+    String response = "{\"status\":\"success\",\"action\":\"up\",\"user\":\"" + username + "\"}";
+    request->send(200, "application/json", response);
+    
+    Serial.printf("API: /api/up by %s\n", username.c_str());
+  });
+
+  // --- API: ガレージ閉める ---
+  server.on("/api/down", HTTP_POST, [authenticateApiUser](AsyncWebServerRequest *request){
+    String username = authenticateApiUser(request);
+    
+    if (username == "") {
+      writeAccessLog(request, "Unauthorized");
+      request->requestAuthentication();
+      return;
+    }
+
+    writeAccessLog(request, username);
+
+    if (request->hasParam("user")) {
+      username = request->getParam("user")->value();
+    }
+
+    DownSendMessage();
+    
+    String response = "{\"status\":\"success\",\"action\":\"down\",\"user\":\"" + username + "\"}";
+    request->send(200, "application/json", response);
+    
+    Serial.printf("API: /api/down by %s\n", username.c_str());
+  });
+
+  // --- API: ガレージ停止 ---
+  server.on("/api/stop", HTTP_POST, [authenticateApiUser](AsyncWebServerRequest *request){
+    String username = authenticateApiUser(request);
+    
+    if (username == "") {
+      writeAccessLog(request, "Unauthorized");
+      request->requestAuthentication();
+      return;
+    }
+
+    writeAccessLog(request, username);
+
+    if (request->hasParam("user")) {
+      username = request->getParam("user")->value();
+    }
+
+    StopSendMessage();
+    
+    String response = "{\"status\":\"success\",\"action\":\"stop\",\"user\":\"" + username + "\"}";
+    request->send(200, "application/json", response);
+    
+    Serial.printf("API: /api/stop by %s\n", username.c_str());
+  });
+
+  // --- API: 照明トグル ---
+  server.on("/api/light", HTTP_POST, [authenticateApiUser](AsyncWebServerRequest *request){
+    String username = authenticateApiUser(request);
+    
+    if (username == "") {
+      writeAccessLog(request, "Unauthorized");
+      request->requestAuthentication();
+      return;
+    }
+
+    writeAccessLog(request, username);
+
+    if (request->hasParam("user")) {
+      username = request->getParam("user")->value();
+    }
+
+    LightSendMessage();
+    String state = digitalRead(Lighting) ? "ON" : "OFF";
+    
+    String response = "{\"status\":\"success\",\"action\":\"light\",\"state\":\"" + state + "\",\"user\":\"" + username + "\"}";
+    request->send(200, "application/json", response);
+    
+    Serial.printf("API: /api/light by %s (state: %s)\n", username.c_str(), state.c_str());
+  });
+
+  // --- API: ステータス取得（認証なし、ログ記録あり）---
+  server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request){
+    writeAccessLog(request, "Public");
+    
+    String lightState = digitalRead(Lighting) ? "ON" : "OFF";
+    String response = "{\"status\":\"success\",\"light\":\"" + lightState + "\"}";
+    request->send(200, "application/json", response);
+  });
+
+  // ============================================================
+  // Web UI エンドポイント（既存）
+  // ============================================================
+
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
     request->send(SPIFFS, "/index.html", String(), false, processor);
@@ -304,7 +471,6 @@ void setup() {
       request->send(res);
       return;
     }
-    // キャッシュ抑止
     AsyncWebServerResponse *res = request->beginResponse(SPIFFS, "/login.html", "text/html; charset=utf-8");
     res->addHeader("Cache-Control", "no-store");
     request->send(res);
@@ -315,12 +481,14 @@ void setup() {
     String u = request->arg("username");
     String p = request->arg("password");
     String redirect = request->hasParam("redirect", true) ? request->getParam("redirect", true)->value() : "/";
-    // オープンリダイレクト対策：相対パスのみ許可
     if (!redirect.startsWith("/")) redirect = "/";
 
-    if (u == HTTP_USER && p == HTTP_PASS) {
-      startSession(request, redirect.length() ? redirect : "/");
+    // 複数ユーザー認証
+    if (authenticateUser(u, p)) {
+      Serial.printf("Login success: %s\n", u.c_str());
+      startSession(request, u, redirect.length() ? redirect : "/");
     } else {
+      Serial.printf("Login failed: %s\n", u.c_str());
       AsyncWebServerResponse *res = request->beginResponse(303);
       res->addHeader("Location", "/login?err=1");
       request->send(res);
@@ -337,17 +505,16 @@ void setup() {
     request->send(SPIFFS, "/style.css", "text/css");
   });
 
-  // login.css を返す
   server.on("/login.css", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(SPIFFS, "/login.css", "text/css");
   });
 
-
   // ---- 制御系（保護）----
   server.on("/up", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
+    String username = getCurrentUsername(request);
     UpSendMessage();
-    sendDiscordUpNotify();
+    sendDiscordUpNotify(username);
     redirectToIndex(request);
   });
 
@@ -439,16 +606,18 @@ void setup() {
   });
 
   server.begin();
+  Serial.println("Server started with API endpoints!");
+  Serial.println("API Base URL: http://" + WiFi.localIP().toString() + "/api/");
 }
 
 unsigned long lastCleanup = 0;
-const unsigned long cleanupInterval = 3600000; // 1時間 = 3600秒 = 3600000ms
+const unsigned long cleanupInterval = 3600000; // 1時間
 
 void loop() {
   if (millis() - lastCleanup > cleanupInterval) {
     Serial.println("Periodic log cleanup...");
     cleanOldLogs();
-    cleanupExpiredSessions(); // セッション掃除も定期実行
+    cleanupExpiredSessions();
     lastCleanup = millis();
   }
   delay(100);
