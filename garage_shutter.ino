@@ -311,24 +311,50 @@ void setup() {
   cleanOldLogs();
   listSpiffsFiles();
 
-  // ログイン中のユーザー一覧をシリアルに表示（デバッグ用）
   Serial.printf("Registered users: %d\n", USER_COUNT);
   for (int i = 0; i < USER_COUNT; i++) {
     Serial.printf(" - %s\n", USERS[i].username);
   }
 
   // ============================================================
-  // iPhone ショートカット用 API エンドポイント
+  // iPhone ショートカット用 API エンドポイント（修正版）
   // ============================================================
 
+  // API用の認証ヘルパー関数（全ユーザー対応 + ログ記録）
+  auto authenticateApiUser = [](AsyncWebServerRequest *request) -> String {
+    // ログを記録
+    writeAccessLog(request);
+    
+    // Authorization ヘッダーを取得
+    if (!request->hasHeader("Authorization")) {
+      return "";
+    }
+    
+    String auth = request->header("Authorization");
+    if (!auth.startsWith("Basic ")) {
+      return "";
+    }
+    
+    // Basic認証の検証（全ユーザーをチェック）
+    for (int i = 0; i < USER_COUNT; i++) {
+      if (request->authenticate(USERS[i].username, USERS[i].password)) {
+        return String(USERS[i].username);
+      }
+    }
+    
+    return "";  // 認証失敗
+  };
+
   // --- API: ガレージ開ける ---
-  server.on("/api/up", HTTP_POST, [](AsyncWebServerRequest *request){
-    if (!request->authenticate(USERS[0].username, USERS[0].password)) {
+  server.on("/api/up", HTTP_POST, [authenticateApiUser](AsyncWebServerRequest *request){
+    String username = authenticateApiUser(request);
+    
+    if (username == "") {
       request->requestAuthentication();
       return;
     }
 
-    String username = USERS[0].username;
+    // userパラメータがあれば上書き（オプション）
     if (request->hasParam("user")) {
       username = request->getParam("user")->value();
     }
@@ -338,16 +364,19 @@ void setup() {
     
     String response = "{\"status\":\"success\",\"action\":\"up\",\"user\":\"" + username + "\"}";
     request->send(200, "application/json", response);
+    
+    Serial.printf("API: /api/up by %s\n", username.c_str());
   });
 
   // --- API: ガレージ閉める ---
-  server.on("/api/down", HTTP_POST, [](AsyncWebServerRequest *request){
-    if (!request->authenticate(USERS[0].username, USERS[0].password)) {
+  server.on("/api/down", HTTP_POST, [authenticateApiUser](AsyncWebServerRequest *request){
+    String username = authenticateApiUser(request);
+    
+    if (username == "") {
       request->requestAuthentication();
       return;
     }
 
-    String username = USERS[0].username;
     if (request->hasParam("user")) {
       username = request->getParam("user")->value();
     }
@@ -356,16 +385,19 @@ void setup() {
     
     String response = "{\"status\":\"success\",\"action\":\"down\",\"user\":\"" + username + "\"}";
     request->send(200, "application/json", response);
+    
+    Serial.printf("API: /api/down by %s\n", username.c_str());
   });
 
   // --- API: ガレージ停止 ---
-  server.on("/api/stop", HTTP_POST, [](AsyncWebServerRequest *request){
-    if (!request->authenticate(USERS[0].username, USERS[0].password)) {
+  server.on("/api/stop", HTTP_POST, [authenticateApiUser](AsyncWebServerRequest *request){
+    String username = authenticateApiUser(request);
+    
+    if (username == "") {
       request->requestAuthentication();
       return;
     }
 
-    String username = USERS[0].username;
     if (request->hasParam("user")) {
       username = request->getParam("user")->value();
     }
@@ -374,16 +406,19 @@ void setup() {
     
     String response = "{\"status\":\"success\",\"action\":\"stop\",\"user\":\"" + username + "\"}";
     request->send(200, "application/json", response);
+    
+    Serial.printf("API: /api/stop by %s\n", username.c_str());
   });
 
   // --- API: 照明トグル ---
-  server.on("/api/light", HTTP_POST, [](AsyncWebServerRequest *request){
-    if (!request->authenticate(USERS[0].username, USERS[0].password)) {
+  server.on("/api/light", HTTP_POST, [authenticateApiUser](AsyncWebServerRequest *request){
+    String username = authenticateApiUser(request);
+    
+    if (username == "") {
       request->requestAuthentication();
       return;
     }
 
-    String username = USERS[0].username;
     if (request->hasParam("user")) {
       username = request->getParam("user")->value();
     }
@@ -393,10 +428,14 @@ void setup() {
     
     String response = "{\"status\":\"success\",\"action\":\"light\",\"state\":\"" + state + "\",\"user\":\"" + username + "\"}";
     request->send(200, "application/json", response);
+    
+    Serial.printf("API: /api/light by %s (state: %s)\n", username.c_str(), state.c_str());
   });
 
-  // --- API: ステータス取得（認証なし）---
+  // --- API: ステータス取得（認証なし、ログ記録あり）---
   server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request){
+    writeAccessLog(request);
+    
     String lightState = digitalRead(Lighting) ? "ON" : "OFF";
     String response = "{\"status\":\"success\",\"light\":\"" + lightState + "\"}";
     request->send(200, "application/json", response);
@@ -460,7 +499,6 @@ void setup() {
   // ---- 制御系（保護）----
   server.on("/up", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!checkAuth(request)) return;
-    
     String username = getCurrentUsername(request);
     UpSendMessage();
     sendDiscordUpNotify(username);
